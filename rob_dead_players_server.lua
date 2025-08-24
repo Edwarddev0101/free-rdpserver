@@ -21,7 +21,11 @@ local function IsPlayerDead(source)
     local playerPed = GetPlayerPed(source)
     if not playerPed then return false end
     
-    return GetEntityHealth(playerPed) <= 0
+    -- Multiple checks for different death states
+    return IsEntityDead(playerPed) or 
+           IsPedDeadOrDying(playerPed, true) or 
+           IsPedFatallyInjured(playerPed) or
+           GetEntityHealth(playerPed) <= 0
 end
 
 -- Get random items from dead player

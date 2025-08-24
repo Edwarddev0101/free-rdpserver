@@ -41,8 +41,7 @@ local function IsPlayerDead(playerId)
     return IsEntityDead(playerPed) or 
            IsPedDeadOrDying(playerPed, true) or 
            IsPedFatallyInjured(playerPed) or
-           GetEntityHealth(playerPed) <= 0 or
-           GetPedHealth(playerPed) <= 0
+           GetEntityHealth(playerPed) <= 0
 end
 
 -- Get closest dead player
@@ -60,8 +59,7 @@ local function GetClosestDeadPlayer()
             local isDead = IsEntityDead(targetPed) or 
                           IsPedDeadOrDying(targetPed, true) or 
                           IsPedFatallyInjured(targetPed) or
-                          GetEntityHealth(targetPed) <= 0 or
-                          GetPedHealth(targetPed) <= 0
+                          GetEntityHealth(targetPed) <= 0
                           
             if isDead then
                 local targetCoords = GetEntityCoords(targetPed)
@@ -104,7 +102,10 @@ CreateThread(function()
                 icon = "fas fa-hand-paper",
                 label = "Rob Dead Player",
                 canInteract = function(entity)
-                    return IsEntityDead(entity) or IsPedDeadOrDying(entity, true)
+                    return IsEntityDead(entity) or 
+                           IsPedDeadOrDying(entity, true) or 
+                           IsPedFatallyInjured(entity) or
+                           GetEntityHealth(entity) <= 0
                 end,
             },
         },
@@ -126,7 +127,12 @@ RegisterNetEvent('rob:client:robDeadPlayer', function(data)
     local targetServerId = GetPlayerServerId(targetPlayerId)
     
     -- Check if target is actually dead
-    if not (IsEntityDead(targetEntity) or IsPedDeadOrDying(targetEntity, true)) then
+    local isDead = IsEntityDead(targetEntity) or 
+                   IsPedDeadOrDying(targetEntity, true) or 
+                   IsPedFatallyInjured(targetEntity) or
+                   GetEntityHealth(targetEntity) <= 0
+                   
+    if not isDead then
         QBCore.Functions.Notify("This player is not dead!", "error")
         return
     end
