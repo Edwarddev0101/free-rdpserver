@@ -29,17 +29,34 @@ function LoadAnimDict(dict)
     end
 end
 
--- Comprehensive dead player check
-local function IsPlayerReallyDead(playerPed)
-    if not DoesEntityExist(playerPed) then return false end
+-- Check if player is dead using server callback (compatible with ambulance job)
+local function IsPlayerReallyDead(playerPed, callback)
+    if not DoesEntityExist(playerPed) then 
+        if callback then callback(false) end
+        return false 
+    end
     
-    -- Check multiple death states
-    if IsEntityDead(playerPed) then return true end
-    if IsPedDeadOrDying(playerPed, true) then return true end
-    if IsPedFatallyInjured(playerPed) then return true end
-    if GetEntityHealth(playerPed) <= 0 then return true end
+    -- Get the server ID from the ped
+    local playerId = NetworkGetPlayerIndexFromPed(playerPed)
+    if playerId == -1 then 
+        if callback then callback(false) end
+        return false 
+    end
     
-    return false
+    local serverId = GetPlayerServerId(playerId)
+    
+    -- Use server callback to check death status (includes ambulance metadata)
+    if callback then
+        QBCore.Functions.TriggerCallback('rob:server:isPlayerDead', function(isDead)
+            callback(isDead)
+        end, serverId)
+    else
+        -- Fallback to entity checks for immediate response
+        return IsEntityDead(playerPed) or 
+               IsPedDeadOrDying(playerPed, true) or 
+               IsPedFatallyInjured(playerPed) or
+               GetEntityHealth(playerPed) <= 0
+    end
 end
 
 -- Get closest dead player
@@ -85,6 +102,7 @@ CreateThread(function()
                 icon = "fas fa-hand-paper",
                 label = "Rob Dead Player",
                 canInteract = function(entity)
+                    -- Use fallback entity checks for immediate response (qb-target needs sync response)
                     return IsPlayerReallyDead(entity)
                 end,
             },
@@ -106,13 +124,7 @@ RegisterNetEvent('rob:client:robDeadPlayer', function(data)
     
     local targetServerId = GetPlayerServerId(targetPlayerId)
     
-    -- Check if target is actually dead
-    if not IsPlayerReallyDead(targetEntity) then
-        QBCore.Functions.Notify("This player is not dead!", "error")
-        return
-    end
-    
-    -- Check distance
+    -- Check distance first
     local playerCoords = GetEntityCoords(PlayerPedId())
     local targetCoords = GetEntityCoords(targetEntity)
     local distance = #(playerCoords - targetCoords)
@@ -122,22 +134,30 @@ RegisterNetEvent('rob:client:robDeadPlayer', function(data)
         return
     end
     
-    -- Start robbing process with animation
-    QBCore.Functions.Progressbar("robbing_player", "Searching dead player...", 5000, false, true, {
-        disableMovement = true,
-        disableCarMovement = true,
-        disableMouse = false,
-        disableCombat = true,
-    }, {}, {}, {}, function() -- Done
-        -- Open inventory directly like admin menu
-        TriggerServerEvent('rob:server:openDeadPlayerInventory', targetServerId)
-    end, function() -- Cancel
-        QBCore.Functions.Notify("Search cancelled", "error")
-        ClearPedTasks(PlayerPedId())
+    -- Check if target is actually dead using server callback (more accurate)
+    IsPlayerReallyDead(targetEntity, function(isDead)
+        if not isDead then
+            QBCore.Functions.Notify("This player is not dead!", "error")
+            return
+        end
+        
+        -- Start robbing process with animation
+        QBCore.Functions.Progressbar("robbing_player", "Searching dead player...", 5000, false, true, {
+            disableMovement = true,
+            disableCarMovement = true,
+            disableMouse = false,
+            disableCombat = true,
+        }, {}, {}, {}, function() -- Done
+            -- Open inventory directly like admin menu
+            TriggerServerEvent('rob:server:openDeadPlayerInventory', targetServerId)
+        end, function() -- Cancel
+            QBCore.Functions.Notify("Search cancelled", "error")
+            ClearPedTasks(PlayerPedId())
+        end)
+        
+        -- Play search animation
+        PlaySearchAnimation()
     end)
-    
-    -- Play search animation
-    PlaySearchAnimation()
 end)
 
 -- Command for robbing closest dead player
@@ -155,23 +175,32 @@ RegisterCommand('rob', function(source, args)
     end
     
     local closestServerId = GetPlayerServerId(closestPlayer)
+    local closestPed = GetPlayerPed(closestPlayer)
     
-    -- Start robbing process with animation
-    QBCore.Functions.Progressbar("robbing_player", "Searching dead player...", 5000, false, true, {
-        disableMovement = true,
-        disableCarMovement = true,
-        disableMouse = false,
-        disableCombat = true,
-    }, {}, {}, {}, function() -- Done
-        -- Open inventory directly like admin menu
-        TriggerServerEvent('rob:server:openDeadPlayerInventory', closestServerId)
-    end, function() -- Cancel
-        QBCore.Functions.Notify("Search cancelled", "error")
-        ClearPedTasks(PlayerPedId())
+    -- Double-check if player is actually dead using server callback
+    IsPlayerReallyDead(closestPed, function(isDead)
+        if not isDead then
+            QBCore.Functions.Notify("This player is not dead!", "error")
+            return
+        end
+        
+        -- Start robbing process with animation
+        QBCore.Functions.Progressbar("robbing_player", "Searching dead player...", 5000, false, true, {
+            disableMovement = true,
+            disableCarMovement = true,
+            disableMouse = false,
+            disableCombat = true,
+        }, {}, {}, {}, function() -- Done
+            -- Open inventory directly like admin menu
+            TriggerServerEvent('rob:server:openDeadPlayerInventory', closestServerId)
+        end, function() -- Cancel
+            QBCore.Functions.Notify("Search cancelled", "error")
+            ClearPedTasks(PlayerPedId())
+        end)
+        
+        -- Play search animation
+        PlaySearchAnimation()
     end)
-    
-    -- Play search animation
-    PlaySearchAnimation()
 end, false)
 
 -- Success notification

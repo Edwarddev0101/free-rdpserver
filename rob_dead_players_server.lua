@@ -13,19 +13,27 @@ local Config = {
 -- Store rob cooldowns
 local robCooldowns = {}
 
--- Check if player is dead
+-- Check if player is dead (compatible with ambulance job)
 local function IsPlayerDead(source)
     local Player = QBCore.Functions.GetPlayer(source)
     if not Player then return false end
     
-    local playerPed = GetPlayerPed(source)
-    if not playerPed then return false end
+    -- Check ambulance job metadata for death status
+    local isDead = Player.PlayerData.metadata['isdead'] or false
+    local inLastStand = Player.PlayerData.metadata['inlaststand'] or false
     
-    -- Multiple checks for different death states
-    return IsEntityDead(playerPed) or 
-           IsPedDeadOrDying(playerPed, true) or 
-           IsPedFatallyInjured(playerPed) or
-           GetEntityHealth(playerPed) <= 0
+    -- Also check entity health as backup
+    local playerPed = GetPlayerPed(source)
+    local entityDead = false
+    if playerPed then
+        entityDead = IsEntityDead(playerPed) or 
+                    IsPedDeadOrDying(playerPed, true) or 
+                    IsPedFatallyInjured(playerPed) or
+                    GetEntityHealth(playerPed) <= 0
+    end
+    
+    -- Player is considered dead if metadata says so OR entity is dead
+    return isDead or inLastStand or entityDead
 end
 
 -- Get random items from dead player
@@ -263,6 +271,11 @@ RegisterServerEvent('rob:server:robDeadPlayer', function(targetId)
     
     -- You can also add webhook logging here if needed
     -- TriggerEvent('qb-log:server:CreateLog', 'robbery', 'Player Robbed', 'red', message, true)
+end)
+
+-- Callback for client to check if player is dead
+QBCore.Functions.CreateCallback('rob:server:isPlayerDead', function(source, cb, targetId)
+    cb(IsPlayerDead(targetId))
 end)
 
 -- Clean up old cooldowns periodically
