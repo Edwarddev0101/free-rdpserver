@@ -29,19 +29,17 @@ function LoadAnimDict(dict)
     end
 end
 
--- Check if player is dead
-local function IsPlayerDead(playerId)
-    local player = GetPlayerFromServerId(playerId)
-    if player == -1 then return false end
-    
-    local playerPed = GetPlayerPed(player)
+-- Comprehensive dead player check
+local function IsPlayerReallyDead(playerPed)
     if not DoesEntityExist(playerPed) then return false end
     
-    -- Multiple checks for different death states
-    return IsEntityDead(playerPed) or 
-           IsPedDeadOrDying(playerPed, true) or 
-           IsPedFatallyInjured(playerPed) or
-           GetEntityHealth(playerPed) <= 0
+    -- Check multiple death states
+    if IsEntityDead(playerPed) then return true end
+    if IsPedDeadOrDying(playerPed, true) then return true end
+    if IsPedFatallyInjured(playerPed) then return true end
+    if GetEntityHealth(playerPed) <= 0 then return true end
+    
+    return false
 end
 
 -- Get closest dead player
@@ -55,13 +53,7 @@ local function GetClosestDeadPlayer()
     for _, player in ipairs(players) do
         local targetPed = GetPlayerPed(player)
         if DoesEntityExist(targetPed) and targetPed ~= playerPed then
-            -- Use same comprehensive death check
-            local isDead = IsEntityDead(targetPed) or 
-                          IsPedDeadOrDying(targetPed, true) or 
-                          IsPedFatallyInjured(targetPed) or
-                          GetEntityHealth(targetPed) <= 0
-                          
-            if isDead then
+            if IsPlayerReallyDead(targetPed) then
                 local targetCoords = GetEntityCoords(targetPed)
                 local distance = #(playerCoords - targetCoords)
                 
@@ -102,10 +94,7 @@ CreateThread(function()
                 icon = "fas fa-hand-paper",
                 label = "Rob Dead Player",
                 canInteract = function(entity)
-                    return IsEntityDead(entity) or 
-                           IsPedDeadOrDying(entity, true) or 
-                           IsPedFatallyInjured(entity) or
-                           GetEntityHealth(entity) <= 0
+                    return IsPlayerReallyDead(entity)
                 end,
             },
         },
@@ -127,12 +116,7 @@ RegisterNetEvent('rob:client:robDeadPlayer', function(data)
     local targetServerId = GetPlayerServerId(targetPlayerId)
     
     -- Check if target is actually dead
-    local isDead = IsEntityDead(targetEntity) or 
-                   IsPedDeadOrDying(targetEntity, true) or 
-                   IsPedFatallyInjured(targetEntity) or
-                   GetEntityHealth(targetEntity) <= 0
-                   
-    if not isDead then
+    if not IsPlayerReallyDead(targetEntity) then
         QBCore.Functions.Notify("This player is not dead!", "error")
         return
     end
