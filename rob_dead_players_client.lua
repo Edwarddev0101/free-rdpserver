@@ -37,7 +37,12 @@ local function IsPlayerDead(playerId)
     local playerPed = GetPlayerPed(player)
     if not DoesEntityExist(playerPed) then return false end
     
-    return IsEntityDead(playerPed) or IsPedDeadOrDying(playerPed, true)
+    -- Multiple checks for different death states
+    return IsEntityDead(playerPed) or 
+           IsPedDeadOrDying(playerPed, true) or 
+           IsPedFatallyInjured(playerPed) or
+           GetEntityHealth(playerPed) <= 0 or
+           GetPedHealth(playerPed) <= 0
 end
 
 -- Get closest dead player
@@ -51,7 +56,14 @@ local function GetClosestDeadPlayer()
     for _, player in ipairs(players) do
         local targetPed = GetPlayerPed(player)
         if DoesEntityExist(targetPed) and targetPed ~= playerPed then
-            if IsEntityDead(targetPed) or IsPedDeadOrDying(targetPed, true) then
+            -- Use same comprehensive death check
+            local isDead = IsEntityDead(targetPed) or 
+                          IsPedDeadOrDying(targetPed, true) or 
+                          IsPedFatallyInjured(targetPed) or
+                          GetEntityHealth(targetPed) <= 0 or
+                          GetPedHealth(targetPed) <= 0
+                          
+            if isDead then
                 local targetCoords = GetEntityCoords(targetPed)
                 local distance = #(playerCoords - targetCoords)
                 
