@@ -72,6 +72,67 @@ local function GetRandomItems(playerItems, maxItems)
     return selectedItems
 end
 
+-- Simple inventory opening for dead players (like admin menu)
+RegisterServerEvent('rob:server:openDeadPlayerInventory', function(targetId)
+    local src = source
+    local Player = QBCore.Functions.GetPlayer(src)
+    local TargetPlayer = QBCore.Functions.GetPlayer(targetId)
+    
+    if not Player then
+        TriggerClientEvent('rob:client:robFailed', src, "Unable to identify player")
+        return
+    end
+    
+    if not TargetPlayer then
+        TriggerClientEvent('rob:client:robFailed', src, "Target player not found")
+        return
+    end
+    
+    -- Check if target is actually dead
+    if not IsPlayerDead(targetId) then
+        TriggerClientEvent('rob:client:robFailed', src, "Target player is not dead")
+        return
+    end
+    
+    -- Check distance between players
+    local robberCoords = GetEntityCoords(GetPlayerPed(src))
+    local targetCoords = GetEntityCoords(GetPlayerPed(targetId))
+    local distance = #(robberCoords - targetCoords)
+    
+    if distance > 3.0 then
+        TriggerClientEvent('rob:client:robFailed', src, "You are too far away from the target")
+        return
+    end
+    
+    -- Set cooldown
+    local playerIdentifier = Player.PlayerData.citizenid
+    local currentTime = os.time() * 1000
+    
+    if robCooldowns[playerIdentifier] and (currentTime - robCooldowns[playerIdentifier]) < Config.RobCooldown then
+        local remainingTime = math.ceil((Config.RobCooldown - (currentTime - robCooldowns[playerIdentifier])) / 1000)
+        TriggerClientEvent('rob:client:robFailed', src, "You must wait " .. remainingTime .. " seconds before robbing again")
+        return
+    end
+    
+    -- Open the target's inventory using the same method as admin menu
+    exports['qb-inventory']:OpenInventoryById(src, targetId)
+    
+    -- Set cooldown
+    robCooldowns[playerIdentifier] = currentTime
+    
+    -- Log the action
+    print(string.format("[ROB] %s (%s) accessed dead player %s (%s) inventory", 
+        Player.PlayerData.name, 
+        Player.PlayerData.citizenid,
+        TargetPlayer.PlayerData.name, 
+        TargetPlayer.PlayerData.citizenid
+    ))
+    
+    -- Notify both players
+    TriggerClientEvent('QBCore:Notify', src, "Accessing dead player's inventory...", "primary", 3000)
+    TriggerClientEvent('QBCore:Notify', targetId, "Someone is accessing your inventory while you're dead!", "error", 5000)
+end)
+
 -- Server event to handle robbing
 RegisterServerEvent('rob:server:robDeadPlayer', function(targetId)
     local src = source

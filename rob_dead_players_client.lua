@@ -68,20 +68,11 @@ local function GetClosestDeadPlayer()
     return closestPlayer, closestDistance
 end
 
--- Rob animation
-local function PlayRobAnimation()
+-- Simple search animation function
+local function PlaySearchAnimation()
     local playerPed = PlayerPedId()
-    
-    LoadAnimDict("amb@medic@standing@kneel@base")
     LoadAnimDict("anim@gangops@facility@servers@bodysearch@")
-    
-    TaskPlayAnim(playerPed, "amb@medic@standing@kneel@base", "base", 8.0, -8.0, -1, 1, 0, false, false, false)
-    Wait(3000)
-    
     TaskPlayAnim(playerPed, "anim@gangops@facility@servers@bodysearch@", "player_search", 8.0, -8.0, -1, 1, 0, false, false, false)
-    Wait(5000)
-    
-    ClearPedTasks(playerPed)
 end
 
 -- Target integration for dead players
@@ -131,21 +122,22 @@ RegisterNetEvent('rob:client:robDeadPlayer', function(data)
         return
     end
     
-    -- Start robbing process
-    QBCore.Functions.Progressbar("robbing_player", "Robbing dead player...", 8000, false, true, {
+    -- Start robbing process with animation
+    QBCore.Functions.Progressbar("robbing_player", "Searching dead player...", 5000, false, true, {
         disableMovement = true,
         disableCarMovement = true,
         disableMouse = false,
         disableCombat = true,
     }, {}, {}, {}, function() -- Done
-        TriggerServerEvent('rob:server:robDeadPlayer', targetServerId)
+        -- Open inventory directly like admin menu
+        TriggerServerEvent('rob:server:openDeadPlayerInventory', targetServerId)
     end, function() -- Cancel
-        QBCore.Functions.Notify("Robbing cancelled", "error")
+        QBCore.Functions.Notify("Search cancelled", "error")
         ClearPedTasks(PlayerPedId())
     end)
     
-    -- Play animation
-    PlayRobAnimation()
+    -- Play search animation
+    PlaySearchAnimation()
 end)
 
 -- Command for robbing closest dead player
@@ -164,21 +156,22 @@ RegisterCommand('rob', function(source, args)
     
     local closestServerId = GetPlayerServerId(closestPlayer)
     
-    -- Start robbing process
-    QBCore.Functions.Progressbar("robbing_player", "Robbing dead player...", 8000, false, true, {
+    -- Start robbing process with animation
+    QBCore.Functions.Progressbar("robbing_player", "Searching dead player...", 5000, false, true, {
         disableMovement = true,
         disableCarMovement = true,
         disableMouse = false,
         disableCombat = true,
     }, {}, {}, {}, function() -- Done
-        TriggerServerEvent('rob:server:robDeadPlayer', closestServerId)
+        -- Open inventory directly like admin menu
+        TriggerServerEvent('rob:server:openDeadPlayerInventory', closestServerId)
     end, function() -- Cancel
-        QBCore.Functions.Notify("Robbing cancelled", "error")
+        QBCore.Functions.Notify("Search cancelled", "error")
         ClearPedTasks(PlayerPedId())
     end)
     
-    -- Play animation
-    PlayRobAnimation()
+    -- Play search animation
+    PlaySearchAnimation()
 end, false)
 
 -- Success notification
